@@ -1,0 +1,62 @@
+---
+title: "wallkill_2018"
+author: "Gavin Lemley"
+date: "April 8, 2019"
+output: html_document
+---
+Load libs
+```{r}
+library(BAP)
+library(tidyverse)
+```
+
+Import data and subset
+```{r}
+macrodata <- readxl::read_excel("NYSDEC_MacroTaxa_WALK_RAS_2018.xlsx",
+                            sheet = "MacroTaxaOutput") %>%
+  rename("REPLICATE" = "Replicate")
+
+```
+
+Data changes and corrections
+```{r}
+# Change Undetermined Amphipoda to Gammarus sp. (the only other amphipod present in this sample). Sample rep 2 at 13-WALK-22.8 on 8-27-18.
+
+macrodata <- macrodata %>% 
+  separate(LOCATION, c("BASIN", "LOCATION", "RIVMILE"), sep = "-") %>% 
+  mutate(RIVMILE = sprintf(round(as.numeric(RIVMILE), digits = 2), fmt = '%#.1f'),
+         MACRO_GENSPECIES = ifelse(MACRO_GENSPECIES == "Undetermined Amphipoda", "Gammarus sp.", MACRO_GENSPECIES)) %>%
+  unite(BAS_LOC_RM, c("BASIN", "LOCATION", "RIVMILE"), remove = FALSE, sep = "-")
+
+```
+
+Run BAP
+```{r}
+long.df.kick<- macrodata %>% 
+  filter(COLLECT %in% "Kick_Sample") %>% 
+  data_prep()
+long.df.multiplate<- macrodata %>% 
+  filter(COLLECT %in% "Multiplate") %>% 
+  data_prep()
+long.df.lowgrad<- macrodata %>% 
+  filter(COLLECT %in% "Low_Gradient") %>% 
+  data_prep()
+
+final.df.kick <- bap_riffle(long.df.kick) %>% 
+  unite(BAS_LOC_RM, c("BASIN", "LOCATION", "RIVMILE"),
+        remove = FALSE, sep = "-")
+final.df.multiplate <- bap_mp_non_nav_water(long.df.multiplate) %>% 
+  unite(BAS_LOC_RM, c("BASIN", "LOCATION", "RIVMILE"),
+        remove = FALSE, sep = "-")
+final.df.lowgrad <- bap_jab(long.df.lowgrad) %>% 
+  unite(BAS_LOC_RM, c("BASIN", "LOCATION", "RIVMILE"),
+        remove = FALSE, sep = "-")
+
+
+write.csv(final.df.kick, "2018wallkill_metrics_kick.csv", row.names = FALSE)
+write.csv(final.df.multiplate, "2018wallkill_metrics_MP.csv", row.names = FALSE)
+write.csv(final.df.lowgrad, "2018wallkill_metrics_LG.csv", row.names = FALSE)
+
+
+```
+
